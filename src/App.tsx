@@ -35,8 +35,10 @@ class App extends React.PureComponent<{}, IAppState> {
       console.log(prefix_regex_with_dots);
       const fa = new FA(prefix_regex_with_dots);
 
-      console.log(fa.getNFA());
-      console.log(fa.toDFA());
+      console.log(fa.get());
+      fa.toDFA();
+      console.log(fa.get());
+      fa.minimize();
     }
   }
 

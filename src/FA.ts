@@ -11,6 +11,13 @@ interface IStackState {
     end_state: string;
 }
 
+interface IDFAState {
+    states: string[];
+    transitions: Map<string, ITransition[]>;
+    begin_state: string;
+    end_states: string[];
+}
+
 export class FA {
     constructor(regex:string) {
         if (regex === '' || !regex) {
@@ -43,12 +50,19 @@ export class FA {
         }
     }
 
-    public getNFA() {
+    public get() {
+        if (this.dfa) {
+            return this.dfa;
+        }
         return this.stack[this.stack.length - 1];
     }
 
     public toDFA() {
-        const nfa = this.getNFA();
+        if (this.dfa) {
+            return;
+        }
+
+        const nfa = this.get();
         // новые состояния и переходы
         const Q = [this.e_closure([nfa.begin_state]).sort()];
         const D = new Map<string, ITransition[]>();
@@ -86,7 +100,77 @@ export class FA {
             Q_dynamic = Q_dynamic.filter((q) => !this.compare(q, current_q));
         }
 
-        return [Q, D];
+        const new_states = Q.map((q) => q.join(""));
+        this.dfa = {
+            begin_state: this.get().begin_state,
+            states: new_states,
+            transitions: D,
+            end_states: new_states.filter((q) => q.includes(this.stack[this.stack.length - 1].end_state))
+        };
+    }
+
+
+    // not tested
+    public minimize() {
+        const p0 = this.dfa?.states.filter((q) => this.dfa?.end_states.indexOf(q) === -1);
+        const p1 = this.dfa?.states.filter((q) => this.dfa?.end_states.indexOf(q) !== -1)
+        let partition = [p0, p1];
+        let nextP = [p0, p1];
+        let worklist = [p0, p1];
+
+        console.log(worklist);
+
+        while (worklist.length !== 0) {
+            const s:string[] = worklist[0]!;
+            worklist.unshift();
+            for (let i = 0; i < this.alphabet.length; i++) {
+                // Image ← {x | δ(x,c) ∈ s}
+                const image:string[] = [];
+                this.dfa?.transitions.forEach((transition, key) => {
+                    transition.map((q) => {
+                        if (q.symbol === this.alphabet[i] && s.indexOf(q.next_state) !== -1) {
+                            image.push(key);
+                        }
+                    })
+                });
+
+                partition.forEach((q) => {
+                    if (q) {
+                        const q1 = q.filter((current_q) => image.indexOf(current_q) !== -1);
+                        const q2 = q.filter((current_q) => q1?.indexOf(current_q) === -1);
+
+                        partition = partition.filter((state) => state && !this.compare(state, q));
+                        nextP = nextP.filter((state) => state && !this.compare(state, q));
+
+                        nextP.push(q1, q2);
+
+                        let is_q_in_worklist = false;
+                        worklist.forEach((s) => {
+                            if (this.compare(s!, q)) {
+                                is_q_in_worklist = true;
+                            }
+                        });
+                        if (is_q_in_worklist) {
+                            worklist.filter((s) => !this.compare(s!, q));
+                            worklist.push(q1, q2);
+                        } else if (q1.length <= q2.length) {
+                            worklist.push(q1);
+                        } else {
+                            worklist.push(q2);
+                        }
+
+                        // возможно выход иначе
+                        if (this.compare(s, q)) {
+                            return;
+                        }
+                    }
+                });
+
+                partition = [...nextP];
+            }
+        }
+
+        console.log(worklist, partition, nextP);
     }
 
     private move(states:string[], a:string):string[] {
@@ -247,6 +331,7 @@ export class FA {
         return array1.every(function(value, index) { return value === array2[index]});
     }
 
+    private dfa:IDFAState | null = null;
     private alphabet = ["a", "b", "c", "0", "1"];
     private stack:IStackState[] = [];
     private epsilon = "eps";
