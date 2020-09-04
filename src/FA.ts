@@ -1,17 +1,6 @@
+import {IFA, IFAState, ITransition} from "./IFA";
 
-interface ITransition {
-    symbol: string;
-    next_state: string;
-}
-
-export interface IFAState {
-    states: string[];
-    transitions: Map<string, ITransition[]>;
-    begin_state: string;
-    end_states: string[];
-}
-
-export class FA {
+export class FA implements IFA {
     constructor(regex:string) {
         if (regex === '' || !regex) {
             this.fromSymbol();
@@ -55,18 +44,16 @@ export class FA {
         return this.minimized;
     }
 
-    public check(some_string:string):boolean | undefined {
-        let result = false;
-
+    public check(some_string:string):boolean {
         if (this.minimized) {
             const { begin_state, end_states, transitions } = this.minimized;
             const list_of_transitions = some_string.split("");
-            let end_state:string | undefined;
+            let terminal_state:string | undefined;
             let current_state:string | undefined = begin_state;
 
             while (current_state) {
                 const transitions_for_current = transitions.get(current_state);
-                end_state = current_state;
+                terminal_state = current_state;
                 current_state = undefined;
                 const symbol = list_of_transitions.shift();
                 transitions_for_current?.forEach((q) => {
@@ -76,8 +63,10 @@ export class FA {
                 });
             }
 
-            return (end_state && list_of_transitions.length === 0 && end_states.indexOf(end_state) !== -1) as boolean;
+            return (terminal_state && list_of_transitions.length === 0 && end_states.indexOf(terminal_state) !== -1) as boolean;
         }
+
+        return false;
     }
 
     public toDFA() {
@@ -87,18 +76,19 @@ export class FA {
 
         const nfa = this.getNFA();
         let begin_state = this.e_closure([nfa.begin_state]).sort();
+        console.log(begin_state.join(""));
         const Q = [begin_state];
         const D = new Map<string, ITransition[]>();
         let Q_dynamic = [...Q];
 
-        console.log("started Q:", [...Q]);
-
         while (Q_dynamic.length !== 0) {
             const current_q = Q_dynamic[0];
+            console.log([...Q_dynamic]);
             for (let i = 0; i < this.alphabet.length; i++) {
                 const S = this.e_closure(this.move(current_q, this.alphabet[i])).sort();
                 console.log(this.alphabet[i], [...S]);
                 if (S.length) {
+                    console.log(this.alphabet[i], [...S]);
                     let push:boolean = true;
                     Q.forEach((value) => {
                         if (this.compare(value, S)) {
@@ -213,7 +203,7 @@ export class FA {
                         // поиск стейтов которые начинаются на old_state
                         this.dfa?.transitions.forEach((transition, key) => {
                             let same:boolean = false;
-                            started_transition.find((t) => {
+                            started_transition.forEach((t) => {
                                 transition.forEach((q) => {
                                     if (q.symbol === t.symbol && q.next_state === t.next_state) {
                                         same = true;
@@ -318,7 +308,7 @@ export class FA {
         states_for_detour.forEach((current_state) => {
             const transitions = this.transitions.get(current_state);
             transitions?.forEach((value) => {
-                if (value.symbol === this.epsilon) {
+                if (value.symbol === this.epsilon && result.indexOf(value.next_state) === -1) {
                     result.push(value.next_state);
                     states_for_detour.push(value.next_state);
                 }
@@ -454,13 +444,11 @@ export class FA {
         return array1.every(function(value, index) { return value === array2[index]});
     }
 
-
     private minimized:IFAState | null = null;
     private dfa:IFAState | null = null;
-    private alphabet = ["a", "b", "c", "0", "1"];
+    private alphabet = ["a", "b", "c", "d", "f", "g", "h", "0", "1"];
     private stack:IFAState[] = [];
     private epsilon = "eps";
-    // состояния типо q1, q2, и т.д.
     private states:string[] = [];
     private transitions = new Map<string, ITransition[]>();
 }

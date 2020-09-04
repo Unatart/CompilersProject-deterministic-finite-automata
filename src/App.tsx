@@ -1,7 +1,8 @@
 import React from 'react';
 import './App.css';
-import {FA, IFAState} from "./FA";
 import {toPostfix} from "./toPostfix";
+import {FA} from "./FA";
+import {IFAState} from "./IFA";
 
 interface IAppState {
   regex: string;
@@ -97,7 +98,6 @@ class App extends React.PureComponent<{}, IAppState> {
       this.fa.toDFA();
       // @ts-ignore
       this.setState({ fa_state: this.state.dfas.push(this.fa.getDFA()) });
-      console.log(this.fa.getDFA());
       this.fa.minimize();
       // @ts-ignore
       this.setState({ fa_state: this.state.dfas.push(this.fa.getMinimized()) });
