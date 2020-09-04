@@ -4,14 +4,7 @@ interface ITransition {
     next_state: string;
 }
 
-interface IStackState {
-    states: string[];
-    transitions: Map<string, ITransition[]>;
-    begin_state: string;
-    end_state: string;
-}
-
-interface IDFAState {
+export interface IFAState {
     states: string[];
     transitions: Map<string, ITransition[]>;
     begin_state: string;
@@ -50,11 +43,41 @@ export class FA {
         }
     }
 
-    public get() {
-        if (this.dfa) {
-            return this.dfa;
-        }
+    public getNFA() {
         return this.stack[this.stack.length - 1];
+    }
+
+    public getDFA() {
+        return this.dfa;
+    }
+
+    public getMinimized() {
+        return this.minimized;
+    }
+
+    public check(some_string:string):boolean | undefined {
+        let result = false;
+
+        if (this.minimized) {
+            const { begin_state, end_states, transitions } = this.minimized;
+            const list_of_transitions = some_string.split("");
+            let end_state:string | undefined;
+            let current_state:string | undefined = begin_state;
+
+            while (current_state) {
+                const transitions_for_current = transitions.get(current_state);
+                end_state = current_state;
+                current_state = undefined;
+                const symbol = list_of_transitions.shift();
+                transitions_for_current?.forEach((q) => {
+                    if (q.symbol === symbol) {
+                        current_state = q.next_state;
+                    }
+                });
+            }
+
+            return (end_state && list_of_transitions.length === 0 && end_states.indexOf(end_state) !== -1) as boolean;
+        }
     }
 
     public toDFA() {
@@ -62,9 +85,9 @@ export class FA {
             return;
         }
 
-        const nfa = this.get();
-        // новые состояния и переходы
-        const Q = [this.e_closure([nfa.begin_state]).sort()];
+        const nfa = this.getNFA();
+        let begin_state = this.e_closure([nfa.begin_state]).sort();
+        const Q = [begin_state];
         const D = new Map<string, ITransition[]>();
         let Q_dynamic = [...Q];
 
@@ -102,32 +125,30 @@ export class FA {
 
         const new_states = Q.map((q) => q.join(""));
         this.dfa = {
-            begin_state: this.get().begin_state,
+            begin_state: begin_state.join(""),
             states: new_states,
             transitions: D,
-            end_states: new_states.filter((q) => q.includes(this.stack[this.stack.length - 1].end_state))
+            end_states: new_states.filter((q) => q.includes(this.stack[this.stack.length - 1].end_states[0]))
         };
     }
 
 
     // not tested
     public minimize() {
-        const p0 = this.dfa?.states.filter((q) => this.dfa?.end_states.indexOf(q) === -1);
-        const p1 = this.dfa?.states.filter((q) => this.dfa?.end_states.indexOf(q) !== -1)
+        const p0 = this.dfa?.states.filter((q) => this.dfa?.end_states.indexOf(q) !== -1);
+        const p1 = this.dfa?.states.filter((q) => this.dfa?.end_states.indexOf(q) === -1);
         let partition = [p0, p1];
         let nextP = [p0, p1];
         let worklist = [p0, p1];
 
-        console.log(worklist);
-
         while (worklist.length !== 0) {
             const s:string[] = worklist[0]!;
-            worklist.unshift();
+            worklist.shift();
             for (let i = 0; i < this.alphabet.length; i++) {
                 // Image ← {x | δ(x,c) ∈ s}
                 const image:string[] = [];
                 this.dfa?.transitions.forEach((transition, key) => {
-                    transition.map((q) => {
+                    transition.forEach((q) => {
                         if (q.symbol === this.alphabet[i] && s.indexOf(q.next_state) !== -1) {
                             image.push(key);
                         }
@@ -139,29 +160,30 @@ export class FA {
                         const q1 = q.filter((current_q) => image.indexOf(current_q) !== -1);
                         const q2 = q.filter((current_q) => q1?.indexOf(current_q) === -1);
 
-                        partition = partition.filter((state) => state && !this.compare(state, q));
-                        nextP = nextP.filter((state) => state && !this.compare(state, q));
+                        if (q1.length !== 0 && q2.length !== 0) {
+                            partition = partition.filter((state) => state && !this.compare(state, q));
+                            nextP = nextP.filter((state) => state && !this.compare(state, q));
 
-                        nextP.push(q1, q2);
+                            nextP.push(q1, q2);
 
-                        let is_q_in_worklist = false;
-                        worklist.forEach((s) => {
-                            if (this.compare(s!, q)) {
-                                is_q_in_worklist = true;
+                            let is_q_in_worklist = false;
+                            worklist.forEach((s) => {
+                                if (this.compare(s!, q)) {
+                                    is_q_in_worklist = true;
+                                }
+                            });
+                            if (is_q_in_worklist) {
+                                worklist.filter((s) => !this.compare(s!, q));
+                                worklist.push(q1, q2);
+                            } else if (q1.length <= q2.length) {
+                                worklist.push(q1);
+                            } else {
+                                worklist.push(q2);
                             }
-                        });
-                        if (is_q_in_worklist) {
-                            worklist.filter((s) => !this.compare(s!, q));
-                            worklist.push(q1, q2);
-                        } else if (q1.length <= q2.length) {
-                            worklist.push(q1);
-                        } else {
-                            worklist.push(q2);
-                        }
 
-                        // возможно выход иначе
-                        if (this.compare(s, q)) {
-                            return;
+                            if (this.compare(s, q)) {
+                                return;
+                            }
                         }
                     }
                 });
@@ -170,7 +192,108 @@ export class FA {
             }
         }
 
-        console.log(worklist, partition, nextP);
+        const new_transitions = new Map<string, ITransition[]>();
+        const new_states:string[] = [];
+
+        partition.forEach((new_state) => {
+            if (new_state) {
+                const new_state_str = new_state.join("");
+
+                new_states.push(new_state_str);
+
+                if (new_state.length === 1) {
+                    const old_transition = this.dfa?.transitions.get(new_state_str);
+                    if (old_transition) {
+                        new_transitions.set(new_state_str, old_transition);
+                    }
+                } else {
+                    const started_transition:ITransition[] = [];
+
+                    new_state.forEach((old_state) => {
+                        // поиск стейтов которые начинаются на old_state
+                        this.dfa?.transitions.forEach((transition, key) => {
+                            let same:boolean = false;
+                            started_transition.find((t) => {
+                                transition.forEach((q) => {
+                                    if (q.symbol === t.symbol && q.next_state === t.next_state) {
+                                        same = true;
+                                    }
+                                })
+                            });
+                            if (key === old_state && !same) {
+                                started_transition.push(...transition);
+                            }
+                        });
+                    });
+
+                    if (started_transition.length !== 0) {
+                        new_transitions.set(new_state_str, started_transition);
+                    }
+                }
+            }
+        });
+
+
+        const new_transitions_with_right_ends = new Map<string, ITransition[]>();
+        new_transitions.forEach((transition, key) => {
+            let new_transition:ITransition[] = [];
+
+            transition.forEach((q) => {
+                if (new_states.indexOf(q.next_state) !== -1) {
+                    new_transition.push(q);
+                } else {
+                    let new_state:string | undefined;
+
+                    partition.forEach((part) => {
+                        if (part && part.indexOf(q.next_state) !== -1) {
+                            new_state = part.join("");
+                            return;
+                        }
+                    });
+
+                    if (new_state) {
+                        new_transition.push({ symbol: q.symbol, next_state: new_state });
+                    }
+                }
+            });
+
+            new_transitions_with_right_ends.set(key, new_transition);
+        });
+
+        let begin_state:string | undefined;
+        const end_states:string[] = [];
+        if (new_states.indexOf(this.dfa!.begin_state) !== -1) {
+            begin_state = this.dfa!.begin_state;
+        } else {
+            partition.forEach((part) => {
+                if (part && part.indexOf(this.dfa!.begin_state) !== -1) {
+                    begin_state = part.join("");
+                    return;
+                }
+            });
+        }
+
+        console.log("partition", partition);
+        this.dfa!.end_states.forEach((end_state) => {
+            if (new_states.indexOf(end_state) !== -1) {
+                end_states.push(end_state);
+            } else {
+                partition.forEach((part) => {
+                    const crossing = this.dfa?.end_states.filter((current_q) => part && part.indexOf(current_q) !== -1);
+                    if (part && crossing?.length && end_states.indexOf(part.join("")) === -1) {
+                        end_states.push(part.join(""));
+                        return;
+                    }
+                });
+            }
+        });
+
+        this.minimized = {
+            begin_state: begin_state!,
+            end_states: end_states,
+            transitions: new_transitions_with_right_ends,
+            states: new_states
+        };
     }
 
     private move(states:string[], a:string):string[] {
@@ -206,26 +329,26 @@ export class FA {
         return result;
     }
 
-    private closure(state:IStackState) {
+    private closure(state:IFAState) {
         console.log('*', Object.assign(state));
         const start_state = this.createState();
         const end_state = this.createState();
 
         this.createTransition(start_state, state.begin_state);
-        this.createTransition(state.end_state, end_state);
+        this.createTransition(state.end_states[0], end_state);
         this.createTransition(start_state, end_state);
-        this.createTransition(state.end_state, state.begin_state);
+        this.createTransition(state.end_states[0], state.begin_state);
         this.stack.push({
             states: new Array(...this.states),
             transitions: new Map(this.transitions),
             begin_state: start_state,
-            end_state: end_state
+            end_states: [end_state]
         });
     }
 
-    private concat(begin:IStackState, end:IStackState) {
+    private concat(begin:IFAState, end:IFAState) {
         console.log('.', Object.assign(begin), Object.assign(end));
-        const start_of_concat = begin.end_state;
+        const start_of_concat = begin.end_states[0];
         const end_of_concat = end.begin_state;
 
         const transition = this.transitions.get(end_of_concat)!;
@@ -236,17 +359,17 @@ export class FA {
             states: new Array(...this.states),
             transitions: new Map(this.transitions),
             begin_state: begin.begin_state,
-            end_state: end.end_state
+            end_states: end.end_states
         });
     }
 
-    private union(begin:IStackState, end:IStackState) {
+    private union(begin:IFAState, end:IFAState) {
         console.log('+', Object.assign(begin), Object.assign(end));
         // соединяем состояния в одну точку в начале и в конце
         const begin_left = begin.begin_state;
-        const begin_right = begin.end_state;
+        const begin_right = begin.end_states[0];
         const end_left = end.begin_state;
-        const end_right = end.end_state;
+        const end_right = end.end_states[0];
 
         const new_states = [`${begin_left}${end_left}`, `${begin_right}${end_right}`];
 
@@ -283,7 +406,7 @@ export class FA {
             states: new Array(...this.states),
             transitions: new Map(this.transitions),
             begin_state: new_states[0],
-            end_state: new_states[1]
+            end_states: [new_states[1]]
         });
     }
 
@@ -296,7 +419,7 @@ export class FA {
             states: new Array(...this.states),
             transitions: new Map(this.transitions),
             begin_state: begin_state,
-            end_state: next_state
+            end_states: [next_state]
         });
     }
 
@@ -331,9 +454,11 @@ export class FA {
         return array1.every(function(value, index) { return value === array2[index]});
     }
 
-    private dfa:IDFAState | null = null;
+
+    private minimized:IFAState | null = null;
+    private dfa:IFAState | null = null;
     private alphabet = ["a", "b", "c", "0", "1"];
-    private stack:IStackState[] = [];
+    private stack:IFAState[] = [];
     private epsilon = "eps";
     // состояния типо q1, q2, и т.д.
     private states:string[] = [];
