@@ -6,8 +6,7 @@ import {IFAState} from "./IFA";
 
 interface IAppState {
   regex: string;
-  dfas: (IFAState | undefined)[];
-  nfa: IFAState | undefined;
+  fas: (IFAState | undefined)[];
   polsk_with_dots: string | undefined;
   check_string: string;
   result_of_check: boolean | undefined;
@@ -22,8 +21,7 @@ interface IFlatTransition {
 class App extends React.PureComponent<{}, IAppState> {
   state:IAppState = {
     regex: "",
-    dfas: [],
-    nfa: undefined,
+    fas: [],
     polsk_with_dots: undefined,
     check_string: "",
     result_of_check: undefined
@@ -41,7 +39,7 @@ class App extends React.PureComponent<{}, IAppState> {
               <div> ----------------------------- </div>
             </div>
           }
-          {this.state.dfas.map((state, i) => {
+          {this.state.fas.map((state, i) => {
             const transitions:IFlatTransition[] = [];
 
             state?.transitions.forEach((transition, key) => {
@@ -51,6 +49,8 @@ class App extends React.PureComponent<{}, IAppState> {
             });
 
             return <div key={i}>
+              <div>{i === 0 ? "NFA:" : i === 1 ? "DFA:" : "MINIMIZED:"}</div>
+              <div/>
               <div>STATES: {state?.states.toString()}</div>
               <div>TRANSITIONS: {
                 transitions.map((transition) =>
@@ -61,7 +61,8 @@ class App extends React.PureComponent<{}, IAppState> {
               <div> ----------------------------- </div>
             </div>
           })}
-          {this.state.nfa &&
+          <div>Insert string for check:</div>
+          {
             <div>
               <input type="text" onChange={this.handleCheckString}/>
               {this.state.check_string && <button onClick={this.handleCheck}>submit</button>}
@@ -93,15 +94,14 @@ class App extends React.PureComponent<{}, IAppState> {
     const prefix_regex_with_dots = toPostfix(regex_with_dots);
     if (prefix_regex_with_dots) {
       this.fa = new FA(prefix_regex_with_dots);
-      this.setState({ polsk_with_dots: prefix_regex_with_dots, nfa: this.fa.getNFA() });
-      console.log(this.fa.getNFA());
+      // @ts-ignore
+      this.setState({ polsk_with_dots: prefix_regex_with_dots, fa_state: this.state.fas.push(this.fa.getNFA()) });
       this.fa.toDFA();
       // @ts-ignore
-      this.setState({ fa_state: this.state.dfas.push(this.fa.getDFA()) });
+      this.setState({ fa_state: this.state.fas.push(this.fa.getDFA()) });
       this.fa.minimize();
       // @ts-ignore
-      this.setState({ fa_state: this.state.dfas.push(this.fa.getMinimized()) });
-      console.log(this.fa.getMinimized());
+      this.setState({ fa_state: this.state.fas.push(this.fa.getMinimized()) });
     }
   }
 

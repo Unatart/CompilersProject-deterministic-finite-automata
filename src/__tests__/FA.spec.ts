@@ -270,8 +270,11 @@ describe("FA", () => {
             expect(fa.check("abb")).toBeTruthy();
         });
         it("aaaabbbb", () => {
-            expect(fa.check("nnnn")).toBeFalsy();
+            expect(fa.check("aaaabbbb")).toBeTruthy();
         });
+        it("babab", () => {
+            expect(fa.check("babab")).toBeFalsy();
+        })
         it("", () => {
             expect(fa.check("")).toBeFalsy();
         });
@@ -331,33 +334,6 @@ describe("FA", () => {
     });
 
     describe("строит и минимизирует (a+b)*abb(a+b)* и проверяет строки:", () => {
-        const regex_with_dots = insertExplicitConcatOperator("(a+b)*abb(a+b)*");
-        const prefix_regex_with_dots = toPostfix(regex_with_dots);
-        console.log(prefix_regex_with_dots);
-        const fa = new FA(prefix_regex_with_dots);
-        fa.toDFA();
-        fa.minimize();
-        it("abb", () => {
-            expect(fa.check("abb")).toBeTruthy();
-        });
-        it("aabbb", () => {
-            expect(fa.check("aabbb")).toBeTruthy();
-        });
-        it("aaaabbbb", () => {
-            expect(fa.check("aaaabbbb")).toBeTruthy();
-        });
-        it("bbbbabbbbbb", () => {
-            expect(fa.check("bbbbabbbbbb")).toBeTruthy();
-        });
-        it("abababbbbbba", () => {
-            expect(fa.check("abababbbbbba")).toBeTruthy();
-        });
-        it("", () => {
-            expect(fa.check("")).toBeFalsy();
-        });
-    });
-
-    describe("строит и минимизирует  и проверяет строки:", () => {
         const regex_with_dots = insertExplicitConcatOperator("(a+b)*abb(a+b)*");
         const prefix_regex_with_dots = toPostfix(regex_with_dots);
         console.log(prefix_regex_with_dots);

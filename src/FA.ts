@@ -122,8 +122,6 @@ export class FA implements IFA {
         };
     }
 
-
-    // not tested
     public minimize() {
         const p0 = this.dfa?.states.filter((q) => this.dfa?.end_states.indexOf(q) !== -1);
         const p1 = this.dfa?.states.filter((q) => this.dfa?.end_states.indexOf(q) === -1);
@@ -200,7 +198,6 @@ export class FA implements IFA {
                     const started_transition:ITransition[] = [];
 
                     new_state.forEach((old_state) => {
-                        // поиск стейтов которые начинаются на old_state
                         this.dfa?.transitions.forEach((transition, key) => {
                             let same:boolean = false;
                             started_transition.forEach((t) => {
@@ -355,7 +352,6 @@ export class FA implements IFA {
 
     private union(begin:IFAState, end:IFAState) {
         console.log('+', Object.assign(begin), Object.assign(end));
-        // соединяем состояния в одну точку в начале и в конце
         const begin_left = begin.begin_state;
         const begin_right = begin.end_states[0];
         const end_left = end.begin_state;
@@ -372,7 +368,6 @@ export class FA implements IFA {
         this.transitions.set(new_states[0], [...begin_left_transitions!, ...end_left_transitions!]);
 
         const new_transitions = new Map();
-        // @ts-ignore
         for (let [key, value] of this.transitions) {
             let new_value:ITransition[] = [];
             value?.map((transition:ITransition) => {
